@@ -1,4 +1,4 @@
-# com.brownian.jshell.JShell
+# JShell
 
 A simple text-based shell application. Ideally, it will work across multiple operating systems. It will target Windows and Linux.
 
