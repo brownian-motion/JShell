@@ -1,23 +1,45 @@
 package com.brownian.jshell;
 
 import com.sun.istack.internal.NotNull;
-import com.sun.istack.internal.Nullable;
 
-import java.io.InputStream;
-import java.util.*;
+import java.io.PrintStream;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Scanner;
 
 /**
  * Actually runs the application.
  * Created by Jack on 1/2/2017.
  */
 public class JShell {
+    //TODO: make JShell an instance, and have main() just pull one up
+    //TODO: figure out piping
     public static void main(String[] args){
+        Scanner input = new Scanner(System.in);
         //noinspection InfiniteLoopStatement
         while(true) {
-            String[] tokens;
             try {
-                tokens = parseLineForTokens(System.in);
-                System.out.println(String.join("\n ",tokens));
+                printPrompt(System.out);
+                //TODO: break up lines by semicolons
+                SingleLineTokenizer tokenizer = new SingleLineTokenizer(input.nextLine());
+                List<String> tokens = new LinkedList<>();
+                while(tokenizer.hasNext())
+                    tokens.add(tokenizer.next());
+                for(String token : tokens){
+                    System.out.println(token);
+                }
+
+                if(tokens.isEmpty())
+                    continue;
+
+                String command = tokens.remove(0);
+
+                try{
+                    BuiltIn builtIn = BuiltIn.getBuiltIn(command);
+                    executeBuiltIn(builtIn, tokens);
+                } catch(IllegalArgumentException e) { //indicating that it is not a built-in
+                    executeFile(command, tokens);
+                }
             } catch (SyntaxError err) {
                 System.err.println(err.getMessage());
             }
@@ -25,70 +47,55 @@ public class JShell {
     }
 
     /**
-     * Gets a line (separated by newlines) from the given input stream and parses it as tokens.
-     * @param inputStream The stream from which to read a line of text
-     * @return An array of Strings representing the tokens. If no tokens are present, an empty array is returned.
+     * Prints the prompt to the specified PrintStream object
+     * @param out the PrintStream object to print to
      */
-    @NotNull
-    public static String[] parseLineForTokens(@NotNull InputStream inputStream) throws SyntaxError{
-        try (Scanner scanner = new Scanner(inputStream)) {
-            String line = scanner.nextLine();
-            return parseLineForTokens(line);
-        } catch (Exception e){
-            System.err.println("Encountered an error:\n\t"+e);
-            return new String[0];
-        }
-    }
-
-    @NotNull
-    public static String[] parseLineForTokens(@NotNull String text) throws SyntaxError{
-        List<String> tokens = new LinkedList<>();
-
-        int cursorIndex = 0;
-
-        while(cursorIndex < text.length()){
-            String nextToken = getNextToken(text, cursorIndex);
-            if(nextToken == null)
-                break;
-            cursorIndex += nextToken.length();
-            tokens.add(nextToken);
-        }
-
-        return tokens.toArray( new String[tokens.size()] );
+    public static void printPrompt(PrintStream out){
+        out.print("> ");
     }
 
     /**
-     * Reads a token from the given text, starting at the given index. If no such token can be found,
-     * returns null.
-     * @param text the text to break into tokens
-     * @param startingIndex the index from which to start tokenizing the given string
-     * @throws SyntaxError if there is a syntax error in the given text
-     * @return The text of the next token (excluding surrounding quotes, for quoted text), or null if no such token could be found
+     * Executes the given built-in command with the given parameters
+     * @param builtIn   Which built-in command to execute
+     * @param arguments What arguments were passed to this command
      */
-    @Nullable
-    public static String getNextToken(@NotNull String text, int startingIndex) throws SyntaxError{
-        while(startingIndex < text.length() && Character.isWhitespace(text.charAt(startingIndex)) )
-            startingIndex++;
-
-        if(startingIndex >= text.length()){
-            return null;
-        } else {
-            if(text.charAt(startingIndex) == '"'){
-                int endQuote = startingIndex + 1;
-                while(endQuote < text.length() && text.charAt(endQuote) != '"'){
-                    endQuote++;
-                }
-                if(endQuote == text.length()){
-                    throw new SyntaxError("No end quote for string literal", text, startingIndex);
-                }
-                return text.substring(startingIndex + 1, endQuote);
-            } else {
-                int endingIndex = startingIndex + 1;
-                while(endingIndex < text.length() && !Character.isWhitespace(text.charAt(endingIndex)) )
-                    endingIndex++;
-                return text.substring(startingIndex, endingIndex);
-            }
+    public static void executeBuiltIn(@NotNull BuiltIn builtIn, @NotNull List<String> arguments){
+        switch(builtIn){
+            case CD:
+                if(arguments.size() == 1)
+                    cd(arguments.get(0));
+                else
+                    System.err.println("Invalid arguments to cd. Type \"help\" for more details.");
+                break;
+            case EXIT:
+                System.exit(0);
+                break;
+            case HELP:
+                //TODO: Check for flags like -h, --help, -v, --verbose, or /?
+                printShortHelp();
+                break;
+            default:
+                throw new AssertionError("Did not implement built-in command "+builtIn);
         }
+    }
+
+    /**
+     * Change directory to the given arguments
+     * @param path the path to change directory to
+     */
+    public static void cd(String path){
+        System.out.println("Changing directory to "+path);
+    }
+
+    /**
+     * Prints a help message explaining how to use the shell, including instructions for the built-in commands.
+     */
+    public static void printShortHelp(){
+        System.out.println("Help");
+    }
+
+    public static void executeFile(@NotNull String filePath, @NotNull List<String> arguments){
+
     }
 
 }
